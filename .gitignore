@@ -1,0 +1,17 @@
+.venv/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.ipynb_checkpoints/
+
+# VS Code Ayar Dosyaları
+.vscode/
+
+# Projede Üretilen Geçici Çıktı Dosyaları (Opsiyonel)
+# Eğer bu çıktıları GitHub'a göndermek istemiyorsan başındaki # işaretlerini kaldırabilirsin:
+
+cikti_portre.jpg
+cikti_derinlik.jpg

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3B Derinlik Tahmini ve Akıllı Portre Stüdyosu</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --text: #f8fafc; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    h1 { margin-top: 0; font-size: 1.6rem; }
+    .toolbar, .controls { background: var(--card); padding: 18px; border-radius: 12px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+    .control-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+    button, .file-label { background: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
+    button.secondary { background: #475569; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .panel { background: var(--card); padding: 12px; border-radius: 12px; text-align: center; }
+    .panel h3 { margin: 6px 0 12px; font-size: 0.95rem; color: #94a3b8; }
+    .panel img { width: 100%; border-radius: 8px; background: #090d16; min-height: 220px; object-fit: contain; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>3B Derinlik Tahmini ve Akıllı Portre Modu (Depth-Anything-V2)</h1>
+
+    <div class="toolbar">
+      <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="uploadImage()" />
+      <label for="fileInput" class="file-label">Fotoğraf Seç ve Yükle</label>
+      <button class="secondary" onclick="loadSample()">Standart Test Fotoğrafını Yükle (test.jpg)</button>
+      <a id="downloadBtn" class="file-label" style="background:#10b981; display:none;" download="akilli_portre.jpg">Sonucu İndir</a>
+      <span id="statusText" style="color:#94a3b8; font-size:0.9rem;">Hazır.</span>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Odak Mesafesi Eşiği: <strong id="valThresh">0.45</strong></label>
+        <input type="range" id="threshold" min="0.05" max="0.95" step="0.02" value="0.45" oninput="adjustPortrait()" />
+      </div>
+      <div class="control-group">
+        <label>Bulanıklık Şiddeti (Bokeh): <strong id="valBlur">35</strong> px</label>
+        <input type="range" id="blurStrength" min="3" max="99" step="2" value="35" oninput="adjustPortrait()" />
+      </div>
+      <div class="control-group">
+        <label>Kenar Geçiş Yumuşaklığı: <strong id="valTrans">0.12</strong></label>
+        <input type="range" id="transition" min="0.01" max="0.40" step="0.01" value="0.12" oninput="adjustPortrait()" />
+      </div>
+      <div class="control-group" style="flex:0.5; min-width:140px;">
+        <label><input type="checkbox" id="invertFocus" onchange="adjustPortrait()" /> Odağı Ters Çevir (Arka Plan Net)</label>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel"><h3>1. Orijinal Görüntü</h3><img id="imgOrig" alt="Orijinal" /></div>
+      <div class="panel"><h3>2. 3B Bağıl Derinlik Haritası</h3><img id="imgDepth" alt="Derinlik" /></div>
+      <div class="panel"><h3>3. Dinamik Alfa Maskesi</h3><img id="imgMask" alt="Maske" /></div>
+      <div class="panel"><h3>4. Akıllı Portre (Bokeh) Çıktısı</h3><img id="imgPortrait" alt="Portre" /></div>
+    </div>
+  </div>
+
+  <script>
+    function updateViews(data) {
+      if (data.original) document.getElementById("imgOrig").src = data.original;
+      if (data.depth) document.getElementById("imgDepth").src = data.depth;
+      if (data.mask) document.getElementById("imgMask").src = data.mask;
+      if (data.portrait) {
+        document.getElementById("imgPortrait").src = data.portrait;
+        const dl = document.getElementById("downloadBtn");
+        dl.href = data.portrait;
+        dl.style.display = "inline-block";
+      }
+    }
+
+    async function uploadImage() {
+      const file = document.getElementById("fileInput").files[0];
+      if (!file) return;
+      document.getElementById("statusText").innerText = "RTX 3060 üzerinde 3B derinlik hesaplanıyor...";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      updateViews(data);
+      document.getElementById("statusText").innerText = "Derinlik haritası çıkarıldı. Kaydırıcılarla anlık düzeltebilirsiniz.";
+    }
+
+    async function loadSample() {
+      document.getElementById("statusText").innerText = "Standart test fotoğrafı işleniyor...";
+      const res = await fetch("/api/load-sample", { method: "POST" });
+      const data = await res.json();
+      updateViews(data);
+      document.getElementById("statusText").innerText = "Test fotoğrafı yüklendi.";
+    }
+
+    async function adjustPortrait() {
+      const thresh = document.getElementById("threshold").value;
+      const blur = document.getElementById("blurStrength").value;
+      const trans = document.getElementById("transition").value;
+      const inv = document.getElementById("invertFocus").checked;
+
+      document.getElementById("valThresh").innerText = thresh;
+      document.getElementById("valBlur").innerText = blur;
+      document.getElementById("valTrans").innerText = trans;
+
+      const formData = new FormData();
+      formData.append("threshold", thresh);
+      formData.append("blur_strength", blur);
+      formData.append("transition", trans);
+      formData.append("invert_focus", inv);
+
+      const res = await fetch("/api/adjust", { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        updateViews(data);
+      }
+    }
+  </script>
+</body>
+</html>
